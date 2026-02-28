@@ -29,7 +29,6 @@ load_dotenv()
 MONGO_INITDB_ROOT_USERNAME = os.getenv('MONGO_INITDB_ROOT_USERNAME')
 MONGO_INITDB_ROOT_PASSWORD = os.getenv('MONGO_INITDB_ROOT_PASSWORD')
 
-
 async def search_logs(level: str | None, request_id: str | None, limit: int):
     # Connect to the local MongoDB instance
     client = AsyncIOMotorClient(f"mongodb://{MONGO_INITDB_ROOT_USERNAME}:{MONGO_INITDB_ROOT_PASSWORD}@localhost:27017")

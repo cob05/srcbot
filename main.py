@@ -62,9 +62,16 @@ async def log_requests(request: Request, call_next):
     # Generate a unique Request ID
     request_id = str(uuid.uuid4())
     
+    # Prefer proxy-forwarded client IP when present, otherwise use socket peer IP.
+    x_forwarded_for = request.headers.get("x-forwarded-for")
+    if x_forwarded_for:
+        client_ip = x_forwarded_for.split(",")[0].strip()
+    else:
+        client_ip = request.headers.get("x-real-ip") or (request.client.host if request.client else "unknown")
+    
     # Bind the ID to the context. Every logger.info() called from here on 
     # out—even inside your route functions—will automatically include this ID!
-    structlog.contextvars.bind_contextvars(request_id=request_id)
+    structlog.contextvars.bind_contextvars(request_id=request_id, client_ip=client_ip)
     
     start_time = time.perf_counter()
     path = request.url.path
@@ -78,7 +85,8 @@ async def log_requests(request: Request, call_next):
             method=request.method,
             endpoint=path,
             status_code=response.status_code,
-            process_time=f"{process_time:.4f}s"
+            process_time=f"{process_time:.4f}s",
+            client_ip=client_ip
         )
         return response
         
@@ -90,7 +98,8 @@ async def log_requests(request: Request, call_next):
             endpoint=path,
             status_code=500,
             process_time=f"{process_time:.4f}s",
-            error=str(e)
+            error=str(e),
+            client_ip=client_ip
         )
         raise e
     
