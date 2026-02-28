@@ -26,7 +26,7 @@ def mongodb_log_processor(_logger, method_name, event_dict):
         async def save_to_mongo(document):
             try:
                 if _mongo_db is not None:
-                    await _mongo_db.api_logs.insert_one(document)
+                    await _mongo_db.srcbot_logs.insert_one(document)
             except Exception as e:
                 print(f"Background MongoDB insert failed: {e}")
 

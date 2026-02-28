@@ -38,11 +38,11 @@ async def lifespan(_app: FastAPI):
     # Create the TTL Index here!
     # expireAfterSeconds = 604800 (which is exactly 7 days)
     # ---------------------------------------------------------
-    # await mongo_db.api_logs.create_index(
+    # await mongo_db.srcbot_logs.create_index(
     #     "created_at", 
     #     expireAfterSeconds=7 * 24 * 60 * 60 
     # )
-    await db.api_logs.create_index("created_at", expireAfterSeconds=7 * 24 * 60 * 60)
+    await db.srcbot_logs.create_index("created_at", expireAfterSeconds=7 * 24 * 60 * 60)
 
     logger.info("Application starting", action="startup")
     
