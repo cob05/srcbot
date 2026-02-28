@@ -38,10 +38,6 @@ async def lifespan(_app: FastAPI):
     # Create the TTL Index here!
     # expireAfterSeconds = 604800 (which is exactly 7 days)
     # ---------------------------------------------------------
-    # await mongo_db.srcbot_logs.create_index(
-    #     "created_at", 
-    #     expireAfterSeconds=7 * 24 * 60 * 60 
-    # )
     await db.srcbot_logs.create_index("created_at", expireAfterSeconds=7 * 24 * 60 * 60)
 
     logger.info("Application starting", action="startup")
@@ -69,8 +65,7 @@ async def log_requests(request: Request, call_next):
     else:
         client_ip = request.headers.get("x-real-ip") or (request.client.host if request.client else "unknown")
     
-    # Bind the ID to the context. Every logger.info() called from here on 
-    # out—even inside your route functions—will automatically include this ID!
+    # Bind the ID to the context. Every logger.info() call will automatically include this ID
     structlog.contextvars.bind_contextvars(request_id=request_id, client_ip=client_ip)
     
     start_time = time.perf_counter()

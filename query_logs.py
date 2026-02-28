@@ -45,7 +45,7 @@ async def search_logs(level: str | None, request_id: str | None, limit: int):
     print("=" * 60)
 
     # Search the collection, sorting by newest first (assuming TimeStamper adds 'timestamp')
-    # If your TimeStamper doesn't add 'timestamp', MongoDB's default order is usually insertion order
+    # If TimeStamper doesn't add 'timestamp', MongoDB's default order is usually insertion order
     cursor = collection.find(query).sort("$natural", -1).limit(limit)
     
     # Fetch the results

@@ -1,4 +1,3 @@
-# log_config.py
 import asyncio
 from datetime import datetime, timezone
 import structlog
