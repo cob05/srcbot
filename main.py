@@ -3,6 +3,7 @@ import time
 import uuid
 import asyncio
 import structlog
+from routers import items
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request
 from datetime import datetime, timezone
@@ -148,7 +149,9 @@ async def log_requests(request: Request, call_next):
 @app.get("/favicon.ico", include_in_schema=False)
 async def favicon():
     # Return the actual file to the browser
-    return FileResponse("favicon.ico")
+    return FileResponse(os.path.join("assets", "static", "images", "favicon", "favicon.ico"))
+
+app.include_router(items.router)
 
 @app.get("/")
 async def read_root():
@@ -156,26 +159,6 @@ async def read_root():
     # while a background task handles saving it to MongoDB.
     # logger.info("Root endpoint accessed", endpoint="/", user="anonymous")
     return {"message": "Hello World"}
-
-@app.post("/items/{item_id}")
-async def create_item(item_id: int, q: str | None = None):
-    if q:
-        logger.info("Item searched", item_id=item_id, query=q, status="success")
-    else:
-        logger.warning("Item requested without query", item_id=item_id)
-        
-    return {"item_id": item_id, "query": q}
-
-@app.get("/items/{item_id}")
-async def get_item(item_id: int):
-    # Notice we don't pass the request_id here manually!
-    logger.info("Fetching item from database", item_id=item_id)
-    
-    # ... pretend we do some database lookup here ...
-    time.sleep(2.5)
-    
-    logger.info("Item fetched successfully", item_id=item_id)
-    return {"item": item_id}
 
 @app.get("/health")
 async def health_check():
