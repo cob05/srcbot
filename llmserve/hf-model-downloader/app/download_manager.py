@@ -35,6 +35,8 @@ class DownloadManager:
         job = DownloadJob(repo_id, filename)
         self.jobs[job.id] = job
 
+        logger.info(f"Created download job {job.id} for {repo_id}/{filename}")
+
         thread = threading.Thread(
             target=self._run_download,
             args=(job,),
@@ -47,6 +49,7 @@ class DownloadManager:
         with self.active_lock:
             try:
                 job.status = "preparing"
+                logger.info(f"Job {job.id} status: preparing")
 
                 files_to_download = [job.filename]
 
@@ -56,6 +59,7 @@ class DownloadManager:
                     selected_mmproj = select_mmproj(job.filename, mmproj_files)
                     if selected_mmproj:
                         files_to_download.append(selected_mmproj)
+                        logger.info(f"Job {job.id}: mmproj file selected: {selected_mmproj}")
 
                 total_size = 0
 
@@ -64,12 +68,17 @@ class DownloadManager:
                     total_size += size
 
                 job.size = total_size
+                logger.info(f"Job {job.id}: total download size: {total_size} bytes")
 
                 if not check_disk_space(total_size):
+                    logger.warning(f"Job {job.id}: insufficient disk space")
                     job.status = "error: insufficient disk"
                     return
 
+                logger.info(f"Job {job.id}: disk space check passed")
+
                 job.status = "downloading"
+                logger.info(f"Job {job.id} status: downloading")
 
                 repo_dir = os.path.join(
                     CACHE_DIR,
@@ -80,9 +89,11 @@ class DownloadManager:
                 sha_results = {}
 
                 for file in files_to_download:
+                    logger.info(f"Job {job.id}: downloading file: {file}")
 
                     if job.cancelled:
                         job.status = "cancelled"
+                        logger.info(f"Job {job.id}: cancelled by user")
                         return
 
                     path = os.path.join(repo_dir, file)
@@ -100,6 +111,7 @@ class DownloadManager:
                 job.sha256 = sha_results
                 job.progress = 100.0
                 job.status = "completed"
+                logger.info(f"Job {job.id}: completed successfully")
 
             except Exception as e:
                 logger.error(str(e))
@@ -107,6 +119,7 @@ class DownloadManager:
 
     def cancel_job(self, job_id: str):
         if job_id in self.jobs:
+            logger.info(f"Cancelling job {job_id}")
             self.jobs[job_id].cancelled = True
 
     def get_job(self, job_id: str) -> DownloadJob | None:

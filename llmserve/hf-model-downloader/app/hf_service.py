@@ -14,6 +14,7 @@ api = HfApi(token=HF_TOKEN)
 
 
 def list_gguf_files(repo_id: str):
+    logger.info(f"Listing GGUF files for repo: {repo_id}")
     try:
         files = api.list_repo_files(repo_id=repo_id)
     except RepositoryNotFoundError:
@@ -21,13 +22,16 @@ def list_gguf_files(repo_id: str):
 
     ggufs = [f for f in files if f.endswith(".gguf")]
     mmproj = [f for f in files if "mmproj" in f.lower()]
-    return sorted(ggufs + mmproj)
+    result = sorted(ggufs + mmproj)
+    logger.info(f"Found {len(result)} GGUF files in {repo_id}")
+    return result
 
 
 def get_file_metadata(repo_id: str, filename: str):
     """
     Returns file size in bytes using get_paths_info.
     """
+    logger.debug(f"Fetching metadata for {filename} in {repo_id}")
     try:
         info = get_paths_info(
             repo_id=repo_id,
@@ -35,17 +39,21 @@ def get_file_metadata(repo_id: str, filename: str):
             repo_type="model"
         )
     except Exception as e:
+        logger.error(f"Error fetching metadata for {filename} in {repo_id}: {str(e)}")
         raise ValueError(f"Unable to fetch metadata: {str(e)}")
 
     if not info:
+        logger.error(f"File {filename} not found in repository {repo_id}")
         raise ValueError("File not found in repository")
 
     file_info = info[0]
 
     # Check if it's a file (RepoFile) and not a folder (RepoFolder)
     if not isinstance(file_info, RepoFile) or file_info.size is None:
+        logger.error(f"Path {filename} in {repo_id} is not a file")
         raise ValueError("Path is not a file")
 
+    logger.info(f"File {filename} size: {file_info.size} bytes")
     return file_info.size
 
 
@@ -53,8 +61,11 @@ def find_mmproj_files(repo_id: str):
     """
     Returns all mmproj files in the repository.
     """
+    logger.debug(f"Searching for mmproj files in {repo_id}")
     files = api.list_repo_files(repo_id=repo_id)
-    return [f for f in files if f.lower().startswith("mmproj") and f.endswith(".gguf")]
+    result = [f for f in files if f.lower().startswith("mmproj") and f.endswith(".gguf")]
+    logger.info(f"Found {len(result)} mmproj files in {repo_id}")
+    return result
 
 
 def select_mmproj(main_filename: str, mmproj_files: list[str]):
@@ -63,6 +74,7 @@ def select_mmproj(main_filename: str, mmproj_files: list[str]):
     """
 
     if not mmproj_files:
+        logger.debug("No mmproj files available for selection")
         return None
 
     # extract quantization string
@@ -78,15 +90,18 @@ def select_mmproj(main_filename: str, mmproj_files: list[str]):
     if quant:
         for f in mmproj_files:
             if quant in f:
+                logger.info(f"Selected mmproj file: {f} (quantization match)")
                 return f
 
     # try f16 mmproj match
     for f in mmproj_files:
         if "bf16" not in f.lower():  # avoid bfloat16 files
             if "f16" in f.lower():
+                logger.info(f"Selected mmproj file: {f} (f16 fallback)")
                 return f
 
     # fallback: first mmproj
+    logger.info(f"Selected mmproj file: {mmproj_files[0]} (fallback)")
     return mmproj_files[0]
 
 
@@ -125,6 +140,7 @@ def detect_base_model_name(files: list[str]):
 
 
 def build_smart_quant_list(repo_id: str):
+    logger.info(f"Building quantization list for repo: {repo_id}")
     files = api.list_repo_files(repo_id=repo_id)
 
     ggufs = [
@@ -136,6 +152,7 @@ def build_smart_quant_list(repo_id: str):
         return None
 
     model_name = detect_base_model_name(ggufs)
+    logger.info(f"Detected model name: {model_name}")
 
     quantizations = []
 
@@ -154,6 +171,7 @@ def build_smart_quant_list(repo_id: str):
     # sort smallest → largest
     quantizations.sort(key=lambda x: x["size_bytes"])
 
+    logger.info(f"Found {len(quantizations)} quantizations for {model_name}")
     return model_name, quantizations
 
 
@@ -167,6 +185,7 @@ def stream_download(
     Streams file with resume + byte-level progress tracking.
     """
 
+    logger.info(f"Starting download: {filename} to {destination_path}")
     url = hf_hub_url(repo_id, filename)
 
     headers = {}
@@ -177,6 +196,7 @@ def stream_download(
         downloaded_bytes = os.path.getsize(destination_path)
         headers["Range"] = f"bytes={downloaded_bytes}-"
         mode = "ab"
+        logger.info(f"Resuming download from {downloaded_bytes} bytes")
 
     job.downloaded = downloaded_bytes
 
@@ -208,4 +228,6 @@ def stream_download(
                 if job.size:
                     job.progress = (downloaded_bytes / job.size) * 100
 
-    return sha256.hexdigest()
+    sha256_hash = sha256.hexdigest()
+    logger.info(f"Download completed: {filename}, sha256: {sha256_hash}")
+    return sha256_hash
