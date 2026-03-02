@@ -39,7 +39,7 @@ class DownloadManager:
         with self.active_lock:
             try:
                 job.status = "preparing"
-                size, _ = get_file_metadata(job.repo_id, job.filename)
+                size = get_file_metadata(job.repo_id, job.filename)
                 job.size = size
 
                 if not check_disk_space(size):
