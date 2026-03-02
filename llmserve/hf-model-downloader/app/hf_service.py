@@ -48,6 +48,47 @@ def get_file_metadata(repo_id: str, filename: str):
     return file_info.size
 
 
+def find_mmproj_files(repo_id: str):
+    """
+    Returns all mmproj files in the repository.
+    """
+    files = api.list_repo_files(repo_id=repo_id)
+    return [f for f in files if f.lower().startswith("mmproj") and f.endswith(".gguf")]
+
+
+def select_mmproj(main_filename: str, mmproj_files: list[str]):
+    """
+    Attempts to find the best mmproj match for the selected GGUF quantization.
+    """
+
+    if not mmproj_files:
+        return None
+
+    # extract quantization string
+    quant = None
+    parts = main_filename.split("-")
+
+    for p in parts:
+        if p.startswith("Q"):
+            quant = p
+            break
+
+    # try exact quantized mmproj match
+    if quant:
+        for f in mmproj_files:
+            if quant in f:
+                return f
+
+    # try f16 mmproj match
+    for f in mmproj_files:
+        if "bf16" not in f.lower():  # avoid bfloat16 files
+            if "f16" in f.lower():
+                return f
+
+    # fallback: first mmproj
+    return mmproj_files[0]
+
+
 def stream_download(
     repo_id: str,
     filename: str,

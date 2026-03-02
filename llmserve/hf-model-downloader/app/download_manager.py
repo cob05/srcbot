@@ -3,7 +3,9 @@ import threading
 import uuid
 from .hf_service import (
     get_file_metadata,
-    stream_download
+    stream_download,
+    find_mmproj_files,
+    select_mmproj
 )
 from .utils import check_disk_space
 from .logger import get_logger
@@ -22,6 +24,7 @@ class DownloadJob:
         self.downloaded: int = 0
         self.sha256: str | None = None
         self.cancelled: bool = False
+        self.files = []
 
 class DownloadManager:
     def __init__(self):
@@ -45,35 +48,56 @@ class DownloadManager:
             try:
                 job.status = "preparing"
 
-                size = get_file_metadata(job.repo_id, job.filename)
-                job.size = size
+                files_to_download = [job.filename]
 
-                if not check_disk_space(size):
+                mmproj_files = find_mmproj_files(job.repo_id)
+
+                if mmproj_files:
+                    selected_mmproj = select_mmproj(job.filename, mmproj_files)
+                    if selected_mmproj:
+                        files_to_download.append(selected_mmproj)
+
+                total_size = 0
+
+                for f in files_to_download:
+                    size = get_file_metadata(job.repo_id, f)
+                    total_size += size
+
+                job.size = total_size
+
+                if not check_disk_space(total_size):
                     job.status = "error: insufficient disk"
                     return
 
                 job.status = "downloading"
 
-                # Create simple cache path (not full HF cache layout)
-                repo_dir = os.path.join(CACHE_DIR, job.repo_id.replace("/", "_"))
+                repo_dir = os.path.join(
+                    CACHE_DIR,
+                    job.repo_id.replace("/", "_")
+                )
                 os.makedirs(repo_dir, exist_ok=True)
 
-                file_path = os.path.join(repo_dir, job.filename)
+                sha_results = {}
 
-                sha256 = stream_download(
-                    job.repo_id,
-                    job.filename,
-                    file_path,
-                    job
-                )
+                for file in files_to_download:
 
-                if job.cancelled:
-                    job.status = "cancelled"
-                    return
+                    if job.cancelled:
+                        job.status = "cancelled"
+                        return
 
-                job.status = "verifying"
-                job.sha256 = sha256
+                    path = os.path.join(repo_dir, file)
 
+                    sha = stream_download(
+                        job.repo_id,
+                        file,
+                        path,
+                        job
+                    )
+
+                    sha_results[file] = sha
+                    job.files.append(path)
+
+                job.sha256 = sha_results
                 job.progress = 100.0
                 job.status = "completed"
 

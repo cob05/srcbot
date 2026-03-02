@@ -15,3 +15,4 @@ class DownloadStatus(BaseModel):
     size_bytes: int | None = None
     downloaded_bytes: int | None = None
     sha256: str | None = None
+    files: list[str] | None = None

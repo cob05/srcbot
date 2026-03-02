@@ -31,7 +31,8 @@ def get_status(job_id: str):
         progress=job.progress,
         size_bytes=job.size,
         downloaded_bytes=job.downloaded,
-        sha256=job.sha256
+        sha256=job.sha256,
+        files=job.files
     )
 
 @app.post("/download/{job_id}/cancel")
