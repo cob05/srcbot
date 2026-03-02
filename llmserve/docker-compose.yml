@@ -1,0 +1,44 @@
+services:
+  downloader:
+    build: ./hf-model-downloader
+    container_name: hf_downloader
+    ports:
+      - "${HF_APP_PORT}:8000"
+    environment:
+      - HF_TOKEN=${HF_TOKEN}
+      - HF_HOME=${HF_HOME:-/data/huggingface}
+    volumes:
+      - hf_cache:${HF_CACHE:-/data/huggingface}
+
+  llm-server:
+    # Use 'ghcr.io/ggml-org/llama.cpp:server' if you DO NOT have an NVIDIA GPU
+    image: ghcr.io/ggml-org/llama.cpp:server
+    # image: ghcr.io/ggml-org/llama.cpp:server-cuda
+    container_name: llm-server
+    restart: unless-stopped
+    ports:
+      - "${LLM_APP_PORT}:8080"
+    volumes:
+      - hf_cache:${HF_CACHE:-/data/huggingface}:ro 
+    command: >
+      -m $HF_CACHE/unsloth_Qwen3-4B-Instruct-2507-GGUF/Qwen3-4B-Instruct-2507-UD-Q4_K_XL.gguf
+      -c 8192
+      -ngl 33
+      --host 0.0.0.0
+      --port 8080
+    
+    # -----------------------------------------------------------------
+    # GPU CONFIGURATION
+    # Remove or comment out the entire 'deploy' block below if you 
+    # are running on a CPU-only machine.
+    # -----------------------------------------------------------------
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+
+volumes:
+  hf_cache:
