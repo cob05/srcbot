@@ -145,7 +145,7 @@ def build_smart_quant_list(repo_id: str):
         quant = parse_quant_from_filename(file)
 
         quantizations.append({
-            "quant": quant,
+            "quant": quant.upper(),
             "file": file,
             "size_bytes": size,
             "size_gb": round(size / (1024**3), 2)
