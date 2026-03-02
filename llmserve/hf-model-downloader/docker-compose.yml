@@ -1,0 +1,17 @@
+version: "3.9"
+
+services:
+  downloader:
+    build: .
+    container_name: hf_downloader
+    ports:
+      - "8000:8000"
+    environment:
+      - HF_TOKEN=${HF_TOKEN}
+      - HF_HOME=/data/huggingface
+    volumes:
+      - hf_cache:/data/huggingface
+
+volumes:
+  hf_cache:
+  
