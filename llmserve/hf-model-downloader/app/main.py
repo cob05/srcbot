@@ -5,7 +5,7 @@ from .hf_service import build_smart_quant_list
 
 app = FastAPI(title="HF GGUF Downloader")
 
-@app.get("/models/{repo_id}", response_model=SmartModelListResponse)
+@app.get("/models/{repo_id:path}", response_model=SmartModelListResponse)
 def list_models(repo_id: str):
 
     result = build_smart_quant_list(repo_id)

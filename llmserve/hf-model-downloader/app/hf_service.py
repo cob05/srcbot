@@ -95,8 +95,9 @@ def parse_quant_from_filename(filename: str):
     Extract quantization string from GGUF filename.
     Works for common formats like:
     Q4_K_M, Q8_0, Q6_K, F16, IQ2_XS, etc.
+    It even captures the new UD- prefix format from Unsloth.
     """
-    pattern = r"(Q\d+_[A-Z0-9_]+|Q\d+|F16|BF16|IQ\d+_[A-Z0-9_]+)"
+    pattern = r"((?:UD-)?(?:Q\d+_[A-Z0-9_]+|Q\d+|F16|BF16|IQ\d+_[A-Z0-9_]+))"
     match = re.search(pattern, filename, re.IGNORECASE)
     if match:
         return match.group(0).upper()
