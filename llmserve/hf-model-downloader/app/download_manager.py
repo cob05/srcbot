@@ -1,6 +1,5 @@
 import threading
 import uuid
-from typing import Dict
 from .hf_service import download_file, compute_sha256, get_file_metadata
 from .utils import check_disk_space
 from .logger import get_logger
@@ -8,23 +7,23 @@ from .logger import get_logger
 logger = get_logger("download_manager")
 
 class DownloadJob:
-    def __init__(self, repo_id, filename):
+    def __init__(self, repo_id: str, filename: str):
         self.id = str(uuid.uuid4())
-        self.repo_id = repo_id
-        self.filename = filename
-        self.status = "queued"
-        self.progress = 0.0
-        self.size = None
-        self.downloaded = 0
-        self.sha256 = None
-        self.cancelled = False
+        self.repo_id: str = repo_id
+        self.filename: str = filename
+        self.status: str = "queued"
+        self.progress: float = 0.0
+        self.size: int | None = None
+        self.downloaded: int = 0
+        self.sha256: str | None = None
+        self.cancelled: bool = False
 
 class DownloadManager:
     def __init__(self):
-        self.jobs: Dict[str, DownloadJob] = {}
+        self.jobs: dict[str, DownloadJob] = {}
         self.active_lock = threading.Lock()
 
-    def create_job(self, repo_id, filename):
+    def create_job(self, repo_id: str, filename: str) -> DownloadJob:
         job = DownloadJob(repo_id, filename)
         self.jobs[job.id] = job
 
@@ -65,11 +64,11 @@ class DownloadManager:
                 logger.error(str(e))
                 job.status = f"error: {str(e)}"
 
-    def cancel_job(self, job_id):
+    def cancel_job(self, job_id: str):
         if job_id in self.jobs:
             self.jobs[job_id].cancelled = True
 
-    def get_job(self, job_id):
+    def get_job(self, job_id: str) -> DownloadJob | None:
         return self.jobs.get(job_id)
 
 download_manager = DownloadManager()

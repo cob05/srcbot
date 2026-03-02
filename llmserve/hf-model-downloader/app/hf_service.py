@@ -1,7 +1,6 @@
-import shutil
 import hashlib
 from huggingface_hub import HfApi, hf_hub_download
-from huggingface_hub.utils import RepositoryNotFoundError
+from huggingface_hub.errors import RepositoryNotFoundError
 from .config import HF_TOKEN
 from .logger import get_logger
 
