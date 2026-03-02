@@ -1,8 +1,13 @@
+import os
 import threading
 import uuid
-from .hf_service import download_file, compute_sha256, get_file_metadata
+from .hf_service import (
+    get_file_metadata,
+    stream_download
+)
 from .utils import check_disk_space
 from .logger import get_logger
+from .config import CACHE_DIR
 
 logger = get_logger("download_manager")
 
@@ -35,10 +40,11 @@ class DownloadManager:
         thread.start()
         return job
 
-    def _run_download(self, job: DownloadJob):
+    def _run_download(self, job):
         with self.active_lock:
             try:
                 job.status = "preparing"
+
                 size = get_file_metadata(job.repo_id, job.filename)
                 job.size = size
 
@@ -48,17 +54,28 @@ class DownloadManager:
 
                 job.status = "downloading"
 
-                path = download_file(job.repo_id, job.filename)
+                # Create simple cache path (not full HF cache layout)
+                repo_dir = os.path.join(CACHE_DIR, job.repo_id.replace("/", "_"))
+                os.makedirs(repo_dir, exist_ok=True)
+
+                file_path = os.path.join(repo_dir, job.filename)
+
+                sha256 = stream_download(
+                    job.repo_id,
+                    job.filename,
+                    file_path,
+                    job
+                )
 
                 if job.cancelled:
                     job.status = "cancelled"
                     return
 
                 job.status = "verifying"
-                job.sha256 = compute_sha256(path)
+                job.sha256 = sha256
 
-                job.status = "completed"
                 job.progress = 100.0
+                job.status = "completed"
 
             except Exception as e:
                 logger.error(str(e))

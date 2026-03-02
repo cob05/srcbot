@@ -1,19 +1,18 @@
-from huggingface_hub import HfApi, hf_hub_download, get_paths_info
-from huggingface_hub.errors import RepositoryNotFoundError
+import os
+import httpx
+import hashlib
+from huggingface_hub import HfApi, hf_hub_url
 from huggingface_hub.hf_api import RepoFile
+from huggingface_hub.errors import RepositoryNotFoundError
+from huggingface_hub import get_paths_info
 from .config import HF_TOKEN
 from .logger import get_logger
-import hashlib
 
 logger = get_logger("hf_service")
-
 api = HfApi(token=HF_TOKEN)
 
 
 def list_gguf_files(repo_id: str):
-    """
-    Lists GGUF files and mmproj files in a repository.
-    """
     try:
         files = api.list_repo_files(repo_id=repo_id)
     except RepositoryNotFoundError:
@@ -21,7 +20,6 @@ def list_gguf_files(repo_id: str):
 
     ggufs = [f for f in files if f.endswith(".gguf")]
     mmproj = [f for f in files if "mmproj" in f.lower()]
-
     return sorted(ggufs + mmproj)
 
 
@@ -50,25 +48,55 @@ def get_file_metadata(repo_id: str, filename: str):
     return file_info.size
 
 
-def download_file(repo_id: str, filename: str):
+def stream_download(
+    repo_id: str,
+    filename: str,
+    destination_path: str,
+    job
+):
     """
-    Downloads a file with resume support.
+    Streams file with resume + byte-level progress tracking.
     """
-    path = hf_hub_download(
-        repo_id=repo_id,
-        filename=filename,
-        token=HF_TOKEN,
-        resume_download=True,
-    )
-    return path
 
+    url = hf_hub_url(repo_id, filename)
 
-def compute_sha256(path: str):
-    """
-    Computes SHA256 of a downloaded file.
-    """
+    headers = {}
+    mode = "wb"
+    downloaded_bytes = 0
+
+    if os.path.exists(destination_path):
+        downloaded_bytes = os.path.getsize(destination_path)
+        headers["Range"] = f"bytes={downloaded_bytes}-"
+        mode = "ab"
+
+    job.downloaded = downloaded_bytes
+
     sha256 = hashlib.sha256()
-    with open(path, "rb") as f:
-        for chunk in iter(lambda: f.read(1024 * 1024), b""):
-            sha256.update(chunk)
+
+    with httpx.stream(
+        "GET",
+        url,
+        headers=headers,
+        timeout=None,
+        follow_redirects=True,
+    ) as response:
+
+        response.raise_for_status()
+
+        with open(destination_path, mode) as f:
+            for chunk in response.iter_bytes(chunk_size=1024 * 1024):
+
+                if job.cancelled:
+                    logger.info("Download cancelled")
+                    return None
+
+                f.write(chunk)
+                sha256.update(chunk)
+
+                downloaded_bytes += len(chunk)
+                job.downloaded = downloaded_bytes
+
+                if job.size:
+                    job.progress = (downloaded_bytes / job.size) * 100
+
     return sha256.hexdigest()
