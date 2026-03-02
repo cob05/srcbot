@@ -1,14 +1,28 @@
 from fastapi import FastAPI, HTTPException
 from .schemas import *
-from .hf_service import list_gguf_files
 from .download_manager import download_manager
+from .hf_service import build_smart_quant_list
 
 app = FastAPI(title="HF GGUF Downloader")
 
-@app.get("/models/{repo_id}", response_model=ModelListResponse)
+@app.get("/models/{repo_id}", response_model=SmartModelListResponse)
 def list_models(repo_id: str):
-    files = list_gguf_files(repo_id)
-    return ModelListResponse(repo_id=repo_id, gguf_files=files)
+
+    result = build_smart_quant_list(repo_id)
+
+    if not result:
+        raise HTTPException(status_code=404, detail="No GGUF models found")
+
+    model_name, quantizations = result
+
+    return SmartModelListResponse(
+        repo_id=repo_id,
+        model_name=model_name,
+        quantizations=[
+            QuantizationInfo(**q)
+            for q in quantizations
+        ]
+    )
 
 @app.post("/download", response_model=DownloadStatus)
 def start_download(req: DownloadRequest):

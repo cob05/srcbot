@@ -1,4 +1,5 @@
 import os
+import re
 import httpx
 import hashlib
 from huggingface_hub import HfApi, hf_hub_url
@@ -87,6 +88,72 @@ def select_mmproj(main_filename: str, mmproj_files: list[str]):
 
     # fallback: first mmproj
     return mmproj_files[0]
+
+
+def parse_quant_from_filename(filename: str):
+    """
+    Extract quantization string from GGUF filename.
+    Works for common formats like:
+    Q4_K_M, Q8_0, Q6_K, F16, IQ2_XS, etc.
+    """
+    pattern = r"(Q\d+_[A-Z0-9_]+|Q\d+|F16|BF16|IQ\d+_[A-Z0-9_]+)"
+    match = re.search(pattern, filename, re.IGNORECASE)
+    if match:
+        return match.group(0).upper()
+    return "UNKNOWN"
+
+
+def detect_base_model_name(files: list[str]):
+    """
+    Attempt to detect base model name by removing quant suffix.
+    """
+    if not files:
+        return "unknown"
+
+    sample = files[0]
+
+    # remove .gguf
+    name = sample.replace(".gguf", "")
+
+    # remove quant portion
+    quant = parse_quant_from_filename(sample)
+    name = name.replace(f"-{quant}", "")
+    name = name.replace(f"_{quant}", "")
+
+    return name
+
+
+def build_smart_quant_list(repo_id: str):
+    files = api.list_repo_files(repo_id=repo_id)
+
+    ggufs = [
+        f for f in files
+        if f.endswith(".gguf") and "mmproj" not in f.lower()
+    ]
+
+    if not ggufs:
+        return None
+
+    model_name = detect_base_model_name(ggufs)
+
+    quantizations = []
+
+    for file in ggufs:
+        size = get_file_metadata(repo_id, file)
+
+        quant = parse_quant_from_filename(file)
+
+        quantizations.append({
+            "quant": quant,
+            "file": file,
+            "size_bytes": size,
+            "size_gb": round(size / (1024**3), 2)
+        })
+
+    # sort smallest → largest
+    quantizations.sort(key=lambda x: x["size_bytes"])
+
+    return model_name, quantizations
 
 
 def stream_download(
